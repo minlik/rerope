@@ -74,7 +74,7 @@ def forward_with_leaky_rerope(
     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
     cos2, sin2 = self.rotary_emb2(value_states, seq_len=kv_seq_len + offset)
     if q_len == 1:
-        position_ids = position_ids[:, -1:] - position_ids
+        position_ids = position_ids[:, -1].unsqueeze(1) - position_ids
         cos = torch.cat([cos[:, :, :window], cos2[:, :, window + offset:]], axis=2)
         sin = torch.cat([sin[:, :, :window], sin2[:, :, window + offset:]], axis=2)
         _, key_states = apply_rotary_pos_emb(None, key_states, cos, -sin, position_ids)
@@ -94,6 +94,7 @@ def forward_with_leaky_rerope(
         attn_weights1 = torch.matmul(query_states1, key_states1.transpose(2, 3)) / math.sqrt(self.head_dim)
         attn_weights2 = torch.matmul(query_states2, key_states2.transpose(2, 3)) / math.sqrt(self.head_dim)
         rectified_mask = (position_ids[:, -q_len:, None] - position_ids[:, None]).abs() < window
+        rectified_mask = rectified_mask.unsqueeze(1)
         attn_weights = torch.where(rectified_mask, attn_weights1, attn_weights2)
 
     if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
